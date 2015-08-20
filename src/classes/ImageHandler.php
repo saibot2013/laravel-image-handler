@@ -58,6 +58,12 @@ class ImageHandler
 		if (empty($width) || !is_numeric($width)) $width = config('image.thumbs_width');
 
 		if (empty($height) || !is_numeric($height)) $height = config('image.thumbs_height');
+		
+		// Use error image if file cannot be found
+		if(!ImageHandler::urlExists($url)){
+			$url = config('image.url_not_found');
+		}
+		$url = URL::asset($url);
 
 		$info = pathinfo($url);
 
@@ -75,11 +81,13 @@ class ImageHandler
 
 		$cacheKey = preg_replace(
 			[
+				'/:hash/',
 				'/:filename/',
 				'/:width/',
 				'/:height/',
 			], 
 			[
+				md5($url),
 				$info['filename'],
 				$width,
 				$height
@@ -90,8 +98,9 @@ class ImageHandler
 		return Cache::remember($cacheKey, config('image.cache_minutes'), function () use($url, $width, $height, $info) {
 
 			$assetPath = sprintf(
-					'%s%s_%sx%s.%s',
+					'%s%s_%s_%sx%s.%s',
 					Config::get('image.thumbs_folder'),
+					md5($url),
 					$info['filename'],
 					$width,
 					$height,
@@ -104,7 +113,14 @@ class ImageHandler
 
 				/// Process image
 				$size = getimagesize($url);
-
+				if(@!is_array($size)){
+					// is not an image...
+					if($url != config('image.url_not_found') && $url != URL::asset(config('image.url_not_found'))){
+						return self::thumb(URL::asset(config('image.url_not_found')), $width, $height);
+					}else{
+						return "image-not-found:". $url;
+					}
+				}
 				// Resize to fit wanted width is too small
 				if ($size[0] < $width) {
 
@@ -170,16 +186,24 @@ class ImageHandler
 	public static function width($url, $width = 0)
 	{
 		if (empty($width) || !is_numeric($width)) $width = config('image.thumbs_width');
+		
+		// Use error image if file cannot be found
+		if(!ImageHandler::urlExists($url)){
+			$url = config('image.url_not_found');
+		}
+		$url = URL::asset($url);
 
 		$info = pathinfo($url);
 
 		$cacheKey = preg_replace(
 			[
+				'/:hash/',
 				'/:filename/',
 				'/:width/',
 				'/:height/',
 			], 
 			[
+				md5($url),
 				$info['filename'],
 				$width,
 				'',
@@ -190,19 +214,27 @@ class ImageHandler
 		return Cache::remember($cacheKey, config('image.cache_minutes'), function () use($url, $width, $info) {
 			
 			$size = getimagesize($url);
+			if(@!is_array($size)){
+				// is not an image...
+				if($url != config('image.url_not_found') && $url != URL::asset(config('image.url_not_found'))){
+					return self::width(URL::asset(config('image.url_not_found')), $width);
+				}else{
+					return "image-not-found:". $url;
+				}
+			}
 
 			$assetPath = sprintf(
-				'%s%s_%sx.%s',
+				'%s%s_%s_%sx.%s',
 				Config::get('image.thumbs_folder'),
+				md5($url),
 				$info['filename'],
 				$width,
 				$info['extension']
 			);
 
 			if (!file_exists(public_path() . $assetPath)) {
-
 				$image = new ImageResize($url);
-
+			
 				$image->interlace = 1;
 
 				$image->scale(ceil(100 + ((($width - $size[0]) / $size[0]) * 100)));
@@ -226,16 +258,24 @@ class ImageHandler
 	public static function height($url, $height = 0)
 	{
 		if (empty($height) || !is_numeric($height)) $height = config('image.thumbs_height');
+		
+		// Use error image if file cannot be found
+		if(!ImageHandler::urlExists($url)){
+			$url = config('image.url_not_found');
+		}
+		$url = URL::asset($url);
 
 		$info = pathinfo($url);
 
 		$cacheKey = preg_replace(
 			[
+				'/:hash/',
 				'/:filename/',
 				'/:width/',
 				'/:height/',
 			], 
 			[
+				md5($url),
 				$info['filename'],
 				'',
 				$height,
@@ -246,10 +286,18 @@ class ImageHandler
 		return Cache::remember($cacheKey, config('image.cache_minutes'), function () use($url, $height, $info) {
 			
 			$size = getimagesize($url);
-
+			if(@!is_array($size)){
+				// is not an image...
+				if($url != config('image.url_not_found') && $url != URL::asset(config('image.url_not_found'))){
+					return self::height(URL::asset(config('image.url_not_found')), $height);
+				}else{
+					return "image-not-found:". $url;
+				}
+			}
 			$assetPath = sprintf(
-				'%s%s_x%s.%s',
+				'%s%s_%s_x%s.%s',
 				Config::get('image.thumbs_folder'),
+				md5($url),
 				$info['filename'],
 				$height,
 				$info['extension']
@@ -268,5 +316,16 @@ class ImageHandler
 
 			return URL::asset($assetPath);
 		});
+	}
+
+	private static function urlExists($url){
+		if($url == "" || $url == NULL || $url == "/"){
+			return false;
+		}
+		if (@fopen($url, "r")) {
+			return true;
+		}else{
+			return false;
+		}
 	}
 }

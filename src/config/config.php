@@ -22,6 +22,14 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Imagesource which will be displayed if original image was not found
+    |--------------------------------------------------------------------------
+    |
+    */
+    'url_not_found' => 'error.jpg', 
+
+    /*
+    |--------------------------------------------------------------------------
     | Default thumb's' width
     |--------------------------------------------------------------------------
     |
@@ -62,5 +70,5 @@ return [
     | :height   = Requested height.
     |
     */
-    'cache_key_format' => ':filename_:widthx:height',
+    'cache_key_format' => ':hash_:filename_:widthx:height',
 ];
