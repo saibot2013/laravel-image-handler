@@ -23,7 +23,8 @@
     },
     "autoload": {
         "psr-4": {
-            "Amostajo\\LaravelImageHandler\\": "src"
+            "Amostajo\\LaravelImageHandler\\": "src",
+            "Amostajo\\LaravelImageHandler\\Provider": "src/providers"
         }
     },
     "minimum-stability": "dev"
