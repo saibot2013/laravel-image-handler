@@ -108,11 +108,8 @@ class ImageHandler
 			);
 
 			if (!file_exists(public_path() . $assetPath)) {
-
-				$image = new ImageResize($url);
-
 				/// Process image
-				$size = getimagesize($url);
+				$size = @getimagesize($url);
 				if(@!is_array($size)){
 					// is not an image...
 					if($url != config('image.url_not_found') && $url != URL::asset(config('image.url_not_found'))){
@@ -121,6 +118,9 @@ class ImageHandler
 						return "image-not-found:". $url;
 					}
 				}
+
+				$image = new ImageResize($url);
+
 				// Resize to fit wanted width is too small
 				if ($size[0] < $width) {
 
@@ -213,7 +213,7 @@ class ImageHandler
 
 		return Cache::remember($cacheKey, config('image.cache_minutes'), function () use($url, $width, $info) {
 			
-			$size = getimagesize($url);
+			$size = @getimagesize($url);
 			if(@!is_array($size)){
 				// is not an image...
 				if($url != config('image.url_not_found') && $url != URL::asset(config('image.url_not_found'))){
@@ -285,7 +285,7 @@ class ImageHandler
 
 		return Cache::remember($cacheKey, config('image.cache_minutes'), function () use($url, $height, $info) {
 			
-			$size = getimagesize($url);
+			$size = @getimagesize($url);
 			if(@!is_array($size)){
 				// is not an image...
 				if($url != config('image.url_not_found') && $url != URL::asset(config('image.url_not_found'))){
