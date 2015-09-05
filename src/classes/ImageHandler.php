@@ -16,6 +16,10 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\URL;
 
+use Imagine\Gd\Imagine;
+use Imagine\Image\Box;
+use Imagine\Image\Point;
+
 class ImageHandler
 {
 	/**
@@ -53,7 +57,7 @@ class ImageHandler
 	 *
 	 * @return string
 	 */
-	public static function thumb($url, $width = 0, $height = 0)
+	public static function thumb($url, $width = 0, $height = 0, $watermark = false)
 	{
 		if (empty($width) || !is_numeric($width)) $width = config('image.thumbs_width');
 
@@ -85,25 +89,28 @@ class ImageHandler
 				'/:filename/',
 				'/:width/',
 				'/:height/',
+				'/:watermark/'
 			], 
 			[
 				md5($url),
 				$info['filename'],
 				$width,
-				$height
+				$height,
+				$watermark
 			], 
 			config('image.cache_key_format')
 		);
 
-		return Cache::remember($cacheKey, config('image.cache_minutes'), function () use($url, $width, $height, $info) {
+		return Cache::remember($cacheKey, config('image.cache_minutes'), function () use($url, $width, $height, $info, $watermark) {
 
 			$assetPath = sprintf(
-					'%s%s_%s_%sx%s.%s',
+					'%s%s_%s_%sx%s%s.%s',
 					Config::get('image.thumbs_folder'),
 					md5($url),
 					$info['filename'],
 					$width,
 					$height,
+					($watermark) ? "_watermarked" : "",
 					$info['extension']
 			);
 
@@ -125,10 +132,11 @@ class ImageHandler
 				if ($size[0] < $width) {
 
 					$scaledPath = sprintf(
-						'%s%s_%sx.%s',
+						'%s%s_%sx%s.%s',
 						Config::get('image.thumbs_folder'),
 						$info['filename'],
 						$width,
+						($watermark) ? "_watermarked" : "",
 						$info['extension']
 					);
 
@@ -147,10 +155,11 @@ class ImageHandler
 				if ($size[1] < $height) {
 
 					$scaledPath = sprintf(
-						'%s%s_x%s.%s',
+						'%s%s_x%s%s.%s',
 						Config::get('image.thumbs_folder'),
 						$info['filename'],
 						$height,
+						($watermark) ? "_watermarked" : "",
 						$info['extension']
 					);
 
@@ -167,6 +176,10 @@ class ImageHandler
 				$image->crop($width, $height);
 
 				$image->save(public_path() . $assetPath);
+
+				if($watermark){
+					ImageHandler::applyWatermark(public_path() . $assetPath, public_path() . Config::get('image.watermark_file'), public_path() . $assetPath);
+				}
 			}
 
 			return URL::asset($assetPath);
@@ -183,7 +196,7 @@ class ImageHandler
 	 *
 	 * @return string
 	 */
-	public static function width($url, $width = 0)
+	public static function width($url, $width = 0, $watermark = false)
 	{
 		if (empty($width) || !is_numeric($width)) $width = config('image.thumbs_width');
 		
@@ -201,18 +214,19 @@ class ImageHandler
 				'/:filename/',
 				'/:width/',
 				'/:height/',
+				'/:watermark/',
 			], 
 			[
 				md5($url),
 				$info['filename'],
 				$width,
 				'',
+				$watermark
 			], 
 			config('image.cache_key_format')
 		);
 
-		return Cache::remember($cacheKey, config('image.cache_minutes'), function () use($url, $width, $info) {
-			
+		return Cache::remember($cacheKey, config('image.cache_minutes'), function () use($url, $width, $info, $watermark) {
 			$size = @getimagesize($url);
 			if(@!is_array($size)){
 				// is not an image...
@@ -224,11 +238,12 @@ class ImageHandler
 			}
 
 			$assetPath = sprintf(
-				'%s%s_%s_%sx.%s',
+				'%s%s_%s_%sx%s.%s',
 				Config::get('image.thumbs_folder'),
 				md5($url),
 				$info['filename'],
 				$width,
+				($watermark) ? "_watermarked" : "",
 				$info['extension']
 			);
 
@@ -240,6 +255,10 @@ class ImageHandler
 				$image->scale(ceil(100 + ((($width - $size[0]) / $size[0]) * 100)));
 
 				$image->save(public_path() . $assetPath);
+
+				if($watermark){
+					ImageHandler::applyWatermark(public_path() . $assetPath, public_path() . Config::get('image.watermark_file'), public_path() . $assetPath);
+				}
 			}
 
 			return URL::asset($assetPath);
@@ -255,7 +274,7 @@ class ImageHandler
 	 *
 	 * @return string
 	 */
-	public static function height($url, $height = 0)
+	public static function height($url, $height = 0, $watermark = false)
 	{
 		if (empty($height) || !is_numeric($height)) $height = config('image.thumbs_height');
 		
@@ -273,17 +292,19 @@ class ImageHandler
 				'/:filename/',
 				'/:width/',
 				'/:height/',
+				'/:watermark/'
 			], 
 			[
 				md5($url),
 				$info['filename'],
 				'',
 				$height,
+				$watermark
 			], 
 			config('image.cache_key_format')
 		);
 
-		return Cache::remember($cacheKey, config('image.cache_minutes'), function () use($url, $height, $info) {
+		return Cache::remember($cacheKey, config('image.cache_minutes'), function () use($url, $height, $info, $watermark) {
 			
 			$size = @getimagesize($url);
 			if(@!is_array($size)){
@@ -295,11 +316,12 @@ class ImageHandler
 				}
 			}
 			$assetPath = sprintf(
-				'%s%s_%s_x%s.%s',
+				'%s%s_%s_x%s%s.%s',
 				Config::get('image.thumbs_folder'),
 				md5($url),
 				$info['filename'],
 				$height,
+				($watermark) ? "_watermarked" : "",
 				$info['extension']
 			);
 
@@ -312,6 +334,10 @@ class ImageHandler
 				$image->scale(ceil(100 + ((($height - $size[1]) / $size[1]) * 100)));
 
 				$image->save(public_path() . $assetPath);
+
+				if($watermark){
+					ImageHandler::applyWatermark(public_path() . $assetPath, public_path() . Config::get('image.watermark_file'), public_path() . $assetPath);
+				}
 			}
 
 			return URL::asset($assetPath);
@@ -328,4 +354,29 @@ class ImageHandler
 			return false;
 		}
 	}
+
+	protected static function applyWatermark($imageFile, $watermarkFile, $watermarkedImageFile)
+    {
+        $imagine = new Imagine;
+        $watermark     = $imagine->open($watermarkFile);
+        $watermarkSize = $watermark->getSize();
+        $image     = $imagine->open($imageFile);
+        $imageSize = $image->getSize();
+        $desiredWatermarkWidth = $imageSize->getWidth() / 5;
+        if($desiredWatermarkWidth < 1) $desiredWatermarkWidth = 1;
+        if ($watermarkSize->getWidth() > $desiredWatermarkWidth) {
+            $desiredWatermarkHeight = 57 / 246 * $desiredWatermarkWidth;
+            if($desiredWatermarkHeight < 1) $desiredWatermarkHeight = 1;
+            $watermark = $watermark->thumbnail(new Box($desiredWatermarkWidth, $desiredWatermarkHeight));
+            $watermarkSize = $watermark->getSize();
+        }
+        $x = 0; //round(($imageSize->getWidth()  - $watermarkSize->getWidth()) / 2);
+        $y = round($imageSize->getHeight() - $watermarkSize->getHeight()) - round($imageSize->getHeight()/10);
+        if($imageSize->getHeight() - $y > $watermarkSize->getHeight() * 2){
+        	$y = $imageSize->getHeight() - $watermarkSize->getHeight() * 2;
+        }
+        $center = new Point($x, $y);
+        $image->paste($watermark, $center);
+        $image->save($watermarkedImageFile);
+    }
 }
