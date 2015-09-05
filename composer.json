@@ -13,7 +13,8 @@
         "php": ">=5.4",
         "illuminate/console": "~5.0",
         "illuminate/support": "~5.0",
-        "eventviva/php-image-resize": "1.5.*"
+        "eventviva/php-image-resize": "1.5.*",
+        "imagine/Imagine" : ">=0.4.0"
     },
     "require-dev": {
         "phpunit/phpunit": "~4.1",
