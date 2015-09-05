@@ -111,7 +111,7 @@ class ImageHandler
 					$width,
 					$height,
 					($watermark) ? "_watermarked" : "",
-					$info['extension']
+					implode(array_slice(explode('?' , $info['extension']), 0, 1), "")
 			);
 
 			if (!file_exists(public_path() . $assetPath)) {
@@ -137,7 +137,7 @@ class ImageHandler
 						$info['filename'],
 						$width,
 						($watermark) ? "_watermarked" : "",
-						$info['extension']
+						implode(array_slice(explode('?' , $info['extension']), 0, 1), "")
 					);
 
 					$image->interlace = 1;
@@ -160,7 +160,7 @@ class ImageHandler
 						$info['filename'],
 						$height,
 						($watermark) ? "_watermarked" : "",
-						$info['extension']
+						implode(array_slice(explode('?' , $info['extension']), 0, 1), "")
 					);
 
 					$image->interlace = 1;
@@ -244,7 +244,7 @@ class ImageHandler
 				$info['filename'],
 				$width,
 				($watermark) ? "_watermarked" : "",
-				$info['extension']
+				implode(array_slice(explode('?' , $info['extension']), 0, 1), "")
 			);
 
 			if (!file_exists(public_path() . $assetPath)) {
@@ -322,7 +322,7 @@ class ImageHandler
 				$info['filename'],
 				$height,
 				($watermark) ? "_watermarked" : "",
-				$info['extension']
+				implode(array_slice(explode('?' , $info['extension']), 0, 1), "")
 			);
 
 			if (!file_exists(public_path() . $assetPath)) {
