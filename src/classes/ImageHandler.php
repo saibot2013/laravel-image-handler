@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\URL;
 use Imagine\Gd\Imagine;
 use Imagine\Image\Box;
 use Imagine\Image\Point;
+use Log;
 
 class ImageHandler
 {
@@ -59,49 +60,52 @@ class ImageHandler
 	 */
 	public static function thumb($url, $width = 0, $height = 0, $watermark = false)
 	{
-		if (empty($width) || !is_numeric($width)) $width = config('image.thumbs_width');
-
-		if (empty($height) || !is_numeric($height)) $height = config('image.thumbs_height');
+		if(empty($width) || !is_numeric($width)){
+			$width = null;
+		}
+		if(empty($height) || !is_numeric($height)){
+			$height = null;
+		}
+		if (is_null($height) && is_null($width)){
+			// allow $width or $height to be empty
+			$width = config('image.thumbs_width');
+			$height = config('image.thumbs_height');
+		} 
 		
-		// Use error image if file cannot be found
-		if(!ImageHandler::urlExists($url)){
-			$url = config('image.url_not_found');
-		}
 		$url = URL::asset($url);
-
-		$info = pathinfo($url);
-
-		if (!isset($info['extension'])) {
-
-			$uniqid = explode('&', $info['filename']);
-
-			$info['filename'] = $uniqid[count($uniqid) - 1];
-
-			$info['extension'] = 'jpg';
-
-		}
-
-		$info['extension'] = explode('?', $info['extension'])[0];
 
 		$cacheKey = preg_replace(
 			[
 				'/:hash/',
-				'/:filename/',
 				'/:width/',
 				'/:height/',
 				'/:watermark/'
 			], 
 			[
 				md5($url),
-				$info['filename'],
 				$width,
 				$height,
 				$watermark
 			], 
 			config('image.cache_key_format')
 		);
+		Log::info("Requesting image for " . $cacheKey);
 
-		return Cache::remember($cacheKey, config('image.cache_minutes'), function () use($url, $width, $height, $info, $watermark) {
+		return Cache::remember($cacheKey, config('image.cache_minutes'), function () use($url, $width, $height, $watermark, $cacheKey) {
+			Log::info("Generating image for " . $cacheKey . ". Caching it for " . config("image.cache_minutes") . " minutes.");
+
+			// Use error image if file cannot be found
+			if(!ImageHandler::urlExists($url)){
+				$url = config('image.url_not_found');
+			}
+
+			$info = pathinfo($url);
+			if (!isset($info['extension'])) {
+				$uniqid = explode('&', $info['filename']);
+				$info['filename'] = $uniqid[count($uniqid) - 1];
+				$info['extension'] = 'jpg';
+			}
+			$info['extension'] = explode('?', $info['extension'])[0];
 
 			$assetPath = sprintf(
 					'%s%s_%s_%sx%s%s.%s',
@@ -114,9 +118,16 @@ class ImageHandler
 					implode(array_slice(explode('?' , $info['extension']), 0, 1), "")
 			);
 
+			$size = @getimagesize($url);
+			if($width == null && $size[1] != 0){
+				$width = $height * ($size[0] / $size[1]);
+			}
+			if($height == null && $size[0] != 0){
+				$height = $width * ($size[1] / $size[0]);
+			}
 			if (!file_exists(public_path() . $assetPath)) {
-				/// Process image
-				$size = @getimagesize($url);
+				
+				// Process image
 				if(@!is_array($size)){
 					// is not an image...
 					if($url != config('image.url_not_found') && $url != URL::asset(config('image.url_not_found'))){
@@ -127,7 +138,6 @@ class ImageHandler
 				}
 
 				$image = new ImageResize($url);
-
 				// Resize to fit wanted width is too small
 				if ($size[0] < $width) {
 
@@ -198,71 +208,7 @@ class ImageHandler
 	 */
 	public static function width($url, $width = 0, $watermark = false)
 	{
-		if (empty($width) || !is_numeric($width)) $width = config('image.thumbs_width');
-		
-		// Use error image if file cannot be found
-		if(!ImageHandler::urlExists($url)){
-			$url = config('image.url_not_found');
-		}
-		$url = URL::asset($url);
-
-		$info = pathinfo($url);
-
-		$cacheKey = preg_replace(
-			[
-				'/:hash/',
-				'/:filename/',
-				'/:width/',
-				'/:height/',
-				'/:watermark/',
-			], 
-			[
-				md5($url),
-				$info['filename'],
-				$width,
-				'',
-				$watermark
-			], 
-			config('image.cache_key_format')
-		);
-
-		return Cache::remember($cacheKey, config('image.cache_minutes'), function () use($url, $width, $info, $watermark) {
-			$size = @getimagesize($url);
-			if(@!is_array($size)){
-				// is not an image...
-				if($url != config('image.url_not_found') && $url != URL::asset(config('image.url_not_found'))){
-					return self::width(URL::asset(config('image.url_not_found')), $width);
-				}else{
-					return "image-not-found:". $url;
-				}
-			}
-
-			$assetPath = sprintf(
-				'%s%s_%s_%sx%s.%s',
-				Config::get('image.thumbs_folder'),
-				md5($url),
-				$info['filename'],
-				$width,
-				($watermark) ? "_watermarked" : "",
-				implode(array_slice(explode('?' , $info['extension']), 0, 1), "")
-			);
-
-			if (!file_exists(public_path() . $assetPath)) {
-				$image = new ImageResize($url);
-			
-				$image->interlace = 1;
-
-				$image->scale(ceil(100 + ((($width - $size[0]) / $size[0]) * 100)));
-
-				$image->save(public_path() . $assetPath);
-
-				if($watermark){
-					ImageHandler::applyWatermark(public_path() . $assetPath, public_path() . Config::get('image.watermark_file'), public_path() . $assetPath);
-				}
-			}
-
-			return URL::asset($assetPath);
-		});
+		return ImageHandler::thumb($url, $width, null, $watermark);
 	}
 
 	/**
@@ -276,72 +222,7 @@ class ImageHandler
 	 */
 	public static function height($url, $height = 0, $watermark = false)
 	{
-		if (empty($height) || !is_numeric($height)) $height = config('image.thumbs_height');
-		
-		// Use error image if file cannot be found
-		if(!ImageHandler::urlExists($url)){
-			$url = config('image.url_not_found');
-		}
-		$url = URL::asset($url);
-
-		$info = pathinfo($url);
-
-		$cacheKey = preg_replace(
-			[
-				'/:hash/',
-				'/:filename/',
-				'/:width/',
-				'/:height/',
-				'/:watermark/'
-			], 
-			[
-				md5($url),
-				$info['filename'],
-				'',
-				$height,
-				$watermark
-			], 
-			config('image.cache_key_format')
-		);
-
-		return Cache::remember($cacheKey, config('image.cache_minutes'), function () use($url, $height, $info, $watermark) {
-			
-			$size = @getimagesize($url);
-			if(@!is_array($size)){
-				// is not an image...
-				if($url != config('image.url_not_found') && $url != URL::asset(config('image.url_not_found'))){
-					return self::height(URL::asset(config('image.url_not_found')), $height);
-				}else{
-					return "image-not-found:". $url;
-				}
-			}
-			$assetPath = sprintf(
-				'%s%s_%s_x%s%s.%s',
-				Config::get('image.thumbs_folder'),
-				md5($url),
-				$info['filename'],
-				$height,
-				($watermark) ? "_watermarked" : "",
-				implode(array_slice(explode('?' , $info['extension']), 0, 1), "")
-			);
-
-			if (!file_exists(public_path() . $assetPath)) {
-
-				$image = new ImageResize($url);
-
-				$image->interlace = 1;
-
-				$image->scale(ceil(100 + ((($height - $size[1]) / $size[1]) * 100)));
-
-				$image->save(public_path() . $assetPath);
-
-				if($watermark){
-					ImageHandler::applyWatermark(public_path() . $assetPath, public_path() . Config::get('image.watermark_file'), public_path() . $assetPath);
-				}
-			}
-
-			return URL::asset($assetPath);
-		});
+		return ImageHandler::thumb($url, null, $height, $watermark);
 	}
 
 	private static function urlExists($url){
